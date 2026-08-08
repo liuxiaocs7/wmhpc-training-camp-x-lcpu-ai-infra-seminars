@@ -10,7 +10,8 @@ __global__ void histogram(const unsigned char *data, unsigned int *hist, int n) 
         unsigned char v = data[i];
         // ====== 空 1：往 hist[v] 里加 1
         //         该用哪个原子操作？ ======
-        /* 填这里 */;
+        // “读取—加一—写回”不是原子操作，线程之间会发生数据竞争，导致部分计数丢失，需要使用原子加
+        atomicAdd(&hist[v], 1);
     }
 }
 

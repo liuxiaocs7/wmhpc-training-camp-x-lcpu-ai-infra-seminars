@@ -24,5 +24,45 @@ import tilelang
 import tilelang.language as T
 
 
+def next_power_of_2(x):
+    return 1 << (x - 1).bit_length()
+
+
+def make_softmax(M, N, threads=128, dtype="float32"):
+    count = next_power_of_2(N)
+    neg_inf = -T.infinity(dtype)
+    
+    @T.prim_func
+    def softmax_kernel(
+        X: T.Buffer((M, N), dtype),
+        Y: T.Buffer((M, N), dtype),
+    ):
+        with T.Kernel(M, threads=threads) as bx:
+            row = T.alloc_fragment((1, count), dtype)
+            row_max = T.alloc_fragment((1,), dtype)
+            row_sum = T.alloc_fragment((1,), dtype)
+
+            for i, j in T.Parallel(1, count):
+                row[i, j] = T.if_then_else(j < N, X[bx, j], neg_inf)
+
+            T.reduce_max(row, row_max, dim=1, clear=True)
+
+            for i, j in T.Parallel(1, count):
+                row[i, j] = T.exp(row[i, j] - row_max[i])
+
+            T.reduce_sum(row, row_sum, dim=1, clear=True)
+
+            for i, j in T.Parallel(1, count):
+                if j < N:
+                    Y[bx, j] = row[i, j] / row_sum[i]
+            
+    return softmax_kernel
+        
+
+
 def softmax(x: torch.Tensor) -> torch.Tensor:
-    raise NotImplementedError("从这里开始写")
+    M, N = x.shape
+    x = x.contiguous()
+    # out_idx=[1] 表示第 2 个参数 Y 是输出，自动分配并返回
+    kernel = tilelang.compile(make_softmax(M, N), out_idx=[1])
+    return kernel(x)

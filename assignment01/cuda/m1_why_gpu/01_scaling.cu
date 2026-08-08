@@ -11,6 +11,7 @@ __global__ void add_one_thread(const float *a, const float *b, float *c, int n) 
 
 // 一个 block、256 个线程。
 __global__ void add_one_block(const float *a, const float *b, float *c, int n) {
+    // 每个线程从自己的下标开始，每次往后跳 blockDim.x(256) 个元素，直到越界。
     for (int i = threadIdx.x; i < n; i += blockDim.x) c[i] = a[i] + b[i];
 }
 

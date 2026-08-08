@@ -14,7 +14,7 @@ __global__ void reverse_blocks(const float *in, float *out, int n) {
     int t = threadIdx.x;
 
     buf[t] = in[base + t];
-    __syncthreads();  // <-- 实验对象
+    // __syncthreads();  // <-- 实验对象
     out[base + t] = buf[BLOCK - 1 - t];
 }
 

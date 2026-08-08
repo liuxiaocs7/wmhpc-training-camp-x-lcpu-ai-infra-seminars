@@ -20,4 +20,36 @@ contract: 实现 run(program) -> (regs, cycles)
 
 
 def run(program):
-    raise NotImplementedError("从这里开始写")
+    # 存储每个 lane 的值
+    regs = list(range(32))
+
+    def execute(instructions, active_lanes):
+        if not active_lanes:
+            return 0
+        cycles = 0
+        for instruction in instructions:
+            op = instruction[0]
+            if op == "add":
+                k = instruction[1]
+                for lane in active_lanes:
+                    regs[lane] += k
+                cycles += 1
+            elif op == "mul":
+                k = instruction[1]
+                for lane in active_lanes:
+                    regs[lane] *= k
+                cycles += 1
+            elif op == "if_lt":
+                _, threshold, then_prog, else_prog = instruction
+                then_lane, else_lane = [], []
+                for lane in active_lanes:
+                    if regs[lane] < threshold:
+                        then_lane.append(lane)
+                    else:
+                        else_lane.append(lane)
+                cycles += execute(then_prog, then_lane)
+                cycles += execute(else_prog, else_lane)
+        return cycles
+
+    cycles = execute(program, list(range(32))) # 存储 active lane 的序号
+    return (regs, cycles)

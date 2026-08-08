@@ -7,6 +7,7 @@ __global__ void hello() {
 }
 
 int main() {
+    // 启动 4 个 block、每个 block 8 个线程
     hello<<<4, 8>>>();
     CUDA_CHECK_KERNEL();
     return 0;

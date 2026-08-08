@@ -12,19 +12,19 @@ int main() {
     printf("compute capability  : %d.%d\n", prop.major, prop.minor);
 
     // ====== 空 1：SM 数量（提示：字段名以 multiProcessor 开头） ======
-    printf("SM 数量             : %d\n", /* 填这里 */);
+    printf("SM 数量             : %d\n", prop.multiProcessorCount);
 
     // ====== 空 2：warp 大小 ======
-    printf("warp 大小           : %d\n", /* 填这里 */);
+    printf("warp 大小           : %d\n", prop.warpSize);
 
     // ====== 空 3：每个 block 可用的 shared memory 上限（字节） ======
-    printf("shared mem / block  : %zu\n", (size_t) /* 填这里 */);
+    printf("shared mem / block  : %zu\n", (size_t) prop.sharedMemPerBlock);
 
     // ====== 空 4：每个 SM 的最大常驻线程数 ======
-    printf("max threads / SM    : %d\n", /* 填这里 */);
+    printf("max threads / SM    : %d\n", prop.maxThreadsPerMultiProcessor);
 
     // ====== 空 5：全局显存总量（字节） ======
-    printf("global mem          : %zu\n", (size_t) /* 填这里 */);
+    printf("global mem          : %zu\n", (size_t) prop.totalGlobalMem);
 
     printf("max threads / block : %d\n", prop.maxThreadsPerBlock);
     return 0;
