@@ -26,7 +26,8 @@ def quant_dequant_per_tensor(x: torch.Tensor) -> torch.Tensor:
     TODO: 实现。步骤:算 scale = amax / 448;除 scale 后 cast 到
     torch.float8_e4m3fn;cast 回 float 再乘 scale。
     """
-    raise NotImplementedError
+    scale = x.abs().max() / E4M3_MAX
+    return (x / scale).to(torch.float8_e4m3fn).float() * scale
 
 
 def rel_err_at(x: torch.Tensor, y: torch.Tensor, value: float) -> float:
@@ -34,7 +35,27 @@ def rel_err_at(x: torch.Tensor, y: torch.Tensor, value: float) -> float:
 
     TODO: 实现(表格的每一格都从这里来)。
     """
-    raise NotImplementedError
+    index = (x - value).abs().argmin()
+    return ((y[index] - x[index]).abs() / x[index].abs()).item()
+
+
+def quant_dequant_per_block(
+    x: torch.Tensor,
+    block_size: int = 128,
+) -> torch.Tensor:
+    y = torch.empty_like(x)
+
+    for start in range(0, x.numel(), block_size):
+        block = x[start: start + block_size]
+        scale = block.abs().max() / E4M3_MAX
+
+        y[start: start + block_size] = (
+            (block / scale)
+            .to(torch.float8_e4m3fn)
+            .float()
+            * scale
+        )
+    return y
 
 
 def main() -> None:
@@ -44,9 +65,39 @@ def main() -> None:
     for v in (0.5, 0.1, 0.01, 0.005, 3000.0):
         print(f"  x≈{v:<8} rel_err={rel_err_at(x, y, v):.3e}")
     # (a) 去掉 outlier 重新量化,对比 0.5 处的误差
+    print("不含outlier:")
+    x_no_outlier = x[:-1]
+    y_no_outlier = quant_dequant_per_tensor(x_no_outlier)
+    print(f"  x≈{0.5:<8} rel_err={rel_err_at(x_no_outlier, y_no_outlier, 0.5):.3e}")
+
     # (b) 找出被量化成 0 的阈值,写出它与 scale 的关系式
+    scale = x.abs().max() / E4M3_MAX
+    q = (x / scale).to(torch.float8_e4m3fn)
+
+    zero_mask = (x != 0) & (q.float() == 0)
+    print("样本中被量化为 0 的最大绝对值:", x[zero_mask].abs().max().item())
+    print("理论阈值:", scale.item() * 2**-10)
+
     # (c) 换 1x128 的 per-block scale,对比含/不含 outlier 的 block
-    # 这三问自己补代码,结果写进报告。
+    y_block = quant_dequant_per_block(x)
+
+    normal_block = 0
+    outlier_block = (x.numel() - 1) // 128
+
+    for name, block_index in [
+        ("普通 block", normal_block),
+        ("outlier block", outlier_block),
+    ]:
+        start = block_index * 128
+        block_x = x[start:start + 128]
+        block_y = y_block[start:start + 128]
+
+        scale = block_x.abs().max() / E4M3_MAX
+        rel_err = (block_y - block_x).abs() / block_x.abs()
+
+        print(name)
+        print("  scale:", scale.item())
+        print("  平均相对误差:", rel_err.mean().item())
 
 
 if __name__ == "__main__":

@@ -20,8 +20,8 @@ __global__ void mma_demo(const __half* A, const __half* B, float* D) {
 
     // A fragment:每线程 8 个 fp16,4 个 b32 寄存器。
     // 寄存器 r 的两个元素:(row, col) 见下标;k 的后半在 r=2,3。
-    unsigned a[4];
-    __half2* ah = reinterpret_cast<__half2*>(a);
+    unsigned a[4];  // 每个 unsigned 装两个 FP16，共 8 个
+    __half2* ah = reinterpret_cast<__half2*>(a);  // __half2 正好是将两个 FP16 打包在一个 32 位对象中
     ah[0] = __halves2half2(A[(group)*16 + tig * 2], A[(group)*16 + tig * 2 + 1]);
     ah[1] = __halves2half2(A[(group + 8) * 16 + tig * 2],
                            A[(group + 8) * 16 + tig * 2 + 1]);
@@ -31,7 +31,7 @@ __global__ void mma_demo(const __half* A, const __half* B, float* D) {
                            A[(group + 8) * 16 + tig * 2 + 9]);
 
     // B fragment(col 布局,B 在内存里按 [k][n] 行主序存):
-    unsigned b[2];
+    unsigned b[2];  // 每个 unsigned 装两个 FP16，共 4 个
     __half2* bh = reinterpret_cast<__half2*>(b);
     bh[0] = __halves2half2(B[(tig * 2) * 8 + group], B[(tig * 2 + 1) * 8 + group]);
     bh[1] = __halves2half2(B[(tig * 2 + 8) * 8 + group],

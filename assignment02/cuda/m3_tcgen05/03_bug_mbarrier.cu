@@ -114,7 +114,7 @@ __global__ void tcgen05_tile(const __nv_bfloat16* gA, const __nv_bfloat16* gB,
                 ".shared::cluster.b64 [%0];" ::"r"(mbar_u32)
                 : "memory");
         }
-        mbar_wait(mbar_u32, 0);
+        mbar_wait(mbar_u32, round & 1);
         asm volatile("tcgen05.fence::after_thread_sync;");
         for (int c = 0; c < N; c += 8) {
             uint32_t src = taddr + ((uint32_t)(warp * 32) << 16) + c;

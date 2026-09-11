@@ -20,19 +20,61 @@ __global__ void probe_kernel(const __nv_bfloat16* __restrict__ in,
                              uint8_t* __restrict__ dataOut,
                              uint8_t* __restrict__ sfOut, int M, int K) {
     // TODO: 与你的 quant kernel 同形的访存,xor 直通,无数学。
+    const int groupsPerRow = K / NVFP4_GROUP;
+    const int64_t totalGroups = (int64_t)M * groupsPerRow;
+    const int numKTiles = nvfp4_num_ktiles(K);
+    const int64_t first = (int64_t)blockIdx.x * BLOCK + threadIdx.x;
+    const int64_t stride = (int64_t)gridDim.x * BLOCK;
+    for (int64_t linear = first; linear < totalGroups; linear += stride) {
+        const int row = (int)(linear / groupsPerRow);
+        const int group = (int)(linear - (int64_t)row * groupsPerRow);
+        const uint16_t* src = reinterpret_cast<const uint16_t*>(in) +
+                              linear * NVFP4_GROUP;
+        uint64_t packed = 0;
+        uint8_t sfByte = 0;
+#pragma unroll
+        for (int i = 0; i < NVFP4_GROUP; i += 2) {
+            const uint16_t lo = src[i];
+            const uint16_t hi = src[i + 1];
+            const uint8_t byte =
+                (uint8_t)(lo ^ (lo >> 8) ^ hi ^ (hi >> 8) ^ 0x5au);
+            packed |= (uint64_t)byte << (i * 4);
+            sfByte ^= byte;
+        }
+        reinterpret_cast<uint64_t*>(dataOut)[linear] = packed;
+        sfOut[sf_swizzled_offset(row, group, numKTiles)] = sfByte;
+    }
 }
 
 static void launch_probe(const __nv_bfloat16* in, uint8_t* dataOut,
                          uint8_t* sfOut, int M, int K, int sms) {
     // TODO: 启动配置。
-    (void)in; (void)dataOut; (void)sfOut; (void)M; (void)K; (void)sms;
+    constexpr int BLOCK = 256;
+    if (M <= 0 || K < NVFP4_GROUP) return;
+    const int64_t totalGroups = (int64_t)M * (K / NVFP4_GROUP);
+    const int64_t needed = (totalGroups + BLOCK - 1) / BLOCK;
+    const int maxBlocks = (sms > 0 ? sms : 1) * 6;
+    const int grid = (int)(needed < maxBlocks ? needed : maxBlocks);
+    probe_kernel<BLOCK><<<grid, BLOCK>>>(in, dataOut, sfOut, M, K);
 }
 
 int main() {
     int sms;
     CUDA_CHECK(cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, 0));
+    // for (const auto& shape :
+    //      {std::pair{4096, 7168}, {16384, 4096}, {16384, 8192}}) {
+
     for (const auto& shape :
-         {std::pair{4096, 7168}, {16384, 4096}, {16384, 8192}}) {
+      {std::pair{1, 4096},
+        {16, 4096},
+        {256, 4096},
+        {1024, 4096},
+        {4096, 4096},
+        {16384, 4096},
+        {4096, 7168},
+        {16384, 7168},
+        {4096, 8192},
+        {16384, 8192}}) {
         int M = shape.first;
         int K = shape.second;
         size_t n = (size_t)M * K;

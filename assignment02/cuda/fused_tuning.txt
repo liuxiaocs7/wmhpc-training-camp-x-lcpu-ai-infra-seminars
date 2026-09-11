@@ -1,0 +1,180 @@
+FUSED_BLOCK=128 FUSED_GRID_MULT=1
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=128 -DFUSED_GRID_MULT=1       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.27       6.66    1.54x PASS(bad=0)
+  16     4096        10.25       6.67    1.54x PASS(bad=0)
+  256    4096        12.31      10.26    1.20x PASS(bad=0)
+  1024   4096        24.37      26.64    0.91x PASS(bad=0)
+  4096   4096        67.41      94.21    0.72x PASS(bad=1)
+  16384  4096       255.26     409.91    0.62x PASS(bad=2)
+  4096   7168       110.70     163.97    0.68x PASS(bad=3)
+  16384  7168       409.34     791.73    0.52x PASS(bad=7)
+  4096   8192       120.84     168.27    0.72x PASS(bad=7)
+  16384  8192       450.67     738.25    0.61x PASS(bad=6)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=128 FUSED_GRID_MULT=2
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=128 -DFUSED_GRID_MULT=2       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.66    1.54x PASS(bad=0)
+  16     4096        10.24       6.69    1.53x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.56      20.50    1.20x PASS(bad=0)
+  4096   4096        67.28      61.88    1.09x PASS(bad=1)
+  16384  4096       255.41     247.73    1.03x PASS(bad=2)
+  4096   7168       110.65     110.19    1.00x PASS(bad=3)
+  16384  7168       409.91     492.50    0.83x PASS(bad=7)
+  4096   8192       120.84     114.90    1.05x PASS(bad=7)
+  16384  8192       450.56     488.48    0.92x PASS(bad=6)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=128 FUSED_GRID_MULT=4
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=128 -DFUSED_GRID_MULT=4       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.66    1.54x PASS(bad=0)
+  16     4096        10.24       6.69    1.53x PASS(bad=0)
+  256    4096        12.31       8.21    1.50x PASS(bad=0)
+  1024   4096        24.51      16.97    1.44x PASS(bad=0)
+  4096   4096        67.23      49.64    1.35x PASS(bad=1)
+  16384  4096       255.27     186.17    1.37x PASS(bad=2)
+  4096   7168       110.65      84.02    1.32x PASS(bad=3)
+  16384  7168       409.35     331.42    1.24x PASS(bad=7)
+  4096   8192       120.84      90.19    1.34x PASS(bad=7)
+  16384  8192       451.18     347.86    1.30x PASS(bad=6)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=128 FUSED_GRID_MULT=6
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=128 -DFUSED_GRID_MULT=6       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.66    1.54x PASS(bad=0)
+  16     4096        10.25       6.69    1.53x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.49      16.41    1.49x PASS(bad=0)
+  4096   4096        67.46      47.19    1.43x PASS(bad=1)
+  16384  4096       254.70     176.90    1.44x PASS(bad=2)
+  4096   7168       110.64      77.47    1.43x PASS(bad=3)
+  16384  7168       409.24     297.94    1.37x PASS(bad=7)
+  4096   8192       121.04      85.46    1.42x PASS(bad=7)
+  16384  8192       451.49     327.07    1.38x PASS(bad=6)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=256 FUSED_GRID_MULT=1
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=256 -DFUSED_GRID_MULT=1       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.16    1.67x PASS(bad=0)
+  16     4096        10.25       6.16    1.66x PASS(bad=0)
+  256    4096        12.30      10.26    1.20x PASS(bad=0)
+  1024   4096        24.51      24.60    1.00x PASS(bad=0)
+  4096   4096        67.31      88.97    0.76x PASS(bad=1)
+  16384  4096       255.62     415.59    0.62x PASS(bad=1)
+  4096   7168       110.65     132.46    0.84x PASS(bad=3)
+  16384  7168       409.60     626.28    0.65x PASS(bad=5)
+  4096   8192       121.35     134.56    0.90x PASS(bad=1)
+  16384  8192       450.67     560.11    0.80x PASS(bad=5)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=256 FUSED_GRID_MULT=2
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=256 -DFUSED_GRID_MULT=2       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.16    1.67x PASS(bad=0)
+  16     4096        10.25       6.16    1.66x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.41      20.50    1.19x PASS(bad=0)
+  4096   4096        67.21      62.16    1.08x PASS(bad=1)
+  16384  4096       255.57     257.82    0.99x PASS(bad=1)
+  4096   7168       110.65      94.29    1.17x PASS(bad=3)
+  16384  7168       409.30     401.57    1.02x PASS(bad=5)
+  4096   8192       121.20     100.71    1.20x PASS(bad=1)
+  16384  8192       451.64     396.85    1.14x PASS(bad=5)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=256 FUSED_GRID_MULT=4
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=256 -DFUSED_GRID_MULT=4       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.27       6.16    1.67x PASS(bad=0)
+  16     4096        10.24       6.16    1.66x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.56      17.49    1.40x PASS(bad=0)
+  4096   4096        67.35      51.79    1.30x PASS(bad=1)
+  16384  4096       255.47     203.83    1.25x PASS(bad=1)
+  4096   7168       110.65      80.29    1.38x PASS(bad=3)
+  16384  7168       409.29     315.50    1.30x PASS(bad=5)
+  4096   8192       120.58      90.40    1.33x PASS(bad=1)
+  16384  8192       450.67     346.01    1.30x PASS(bad=5)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=256 FUSED_GRID_MULT=6
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=256 -DFUSED_GRID_MULT=6       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.16    1.66x PASS(bad=0)
+  16     4096        10.25       6.16    1.66x PASS(bad=0)
+  256    4096        12.31       8.21    1.50x PASS(bad=0)
+  1024   4096        24.55      16.40    1.50x PASS(bad=0)
+  4096   4096        67.41      49.21    1.37x PASS(bad=1)
+  16384  4096       255.77     189.19    1.35x PASS(bad=1)
+  4096   7168       110.70      77.88    1.42x PASS(bad=3)
+  16384  7168       409.40     303.47    1.35x PASS(bad=5)
+  4096   8192       120.98      87.96    1.38x PASS(bad=1)
+  16384  8192       451.69     337.21    1.34x PASS(bad=5)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=512 FUSED_GRID_MULT=1
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=512 -DFUSED_GRID_MULT=1       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.16    1.67x PASS(bad=0)
+  16     4096        10.24       6.16    1.66x PASS(bad=0)
+  256    4096        12.31      10.24    1.20x PASS(bad=0)
+  1024   4096        24.49      23.71    1.03x PASS(bad=0)
+  4096   4096        67.33      82.44    0.82x PASS(bad=0)
+  16384  4096       255.26     360.79    0.71x PASS(bad=3)
+  4096   7168       110.65     119.51    0.93x PASS(bad=3)
+  16384  7168       409.66     537.65    0.76x PASS(bad=5)
+  4096   8192       120.84     128.11    0.94x PASS(bad=1)
+  16384  8192       450.88     558.14    0.81x PASS(bad=4)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=512 FUSED_GRID_MULT=2
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=512 -DFUSED_GRID_MULT=2       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.16    1.66x PASS(bad=0)
+  16     4096        10.25       6.16    1.66x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.47      20.49    1.19x PASS(bad=0)
+  4096   4096        67.36      61.52    1.09x PASS(bad=0)
+  16384  4096       255.42     235.17    1.09x PASS(bad=3)
+  4096   7168       110.65      95.13    1.16x PASS(bad=3)
+  16384  7168       409.34     392.34    1.04x PASS(bad=5)
+  4096   8192       120.94     103.58    1.17x PASS(bad=1)
+  16384  8192       451.49     421.38    1.07x PASS(bad=4)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=512 FUSED_GRID_MULT=4
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=512 -DFUSED_GRID_MULT=4       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.27       6.16    1.67x PASS(bad=0)
+  16     4096        10.24       6.16    1.66x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.37      17.77    1.37x PASS(bad=0)
+  4096   4096        67.35      59.42    1.13x PASS(bad=0)
+  16384  4096       255.62     237.78    1.08x PASS(bad=3)
+  4096   7168       110.65      89.76    1.23x PASS(bad=3)
+  16384  7168       409.65     367.80    1.11x PASS(bad=5)
+  4096   8192       120.99      98.77    1.22x PASS(bad=1)
+  16384  8192       450.77     397.72    1.13x PASS(bad=4)
+rm bin/m5_lowprec/04_fused_rms_nvfp4
+FUSED_BLOCK=512 FUSED_GRID_MULT=6
+nvcc -O2 -std=c++17 -I. --expt-relaxed-constexpr       -DFUSED_BLOCK=512 -DFUSED_GRID_MULT=6       -DRMS_BLOCK=512 -DRMS_GRID_MULT=2 -gencode arch=compute_100f,code=sm_100f -o bin/m5_lowprec/04_fused_rms_nvfp4 m5_lowprec/04_fused_rms_nvfp4.cu
+./bin/m5_lowprec/04_fused_rms_nvfp4
+# M      K        2step_us   fused_us  speedup
+  1      4096        10.26       6.16    1.67x PASS(bad=0)
+  16     4096        10.25       6.16    1.66x PASS(bad=0)
+  256    4096        12.30       8.21    1.50x PASS(bad=0)
+  1024   4096        24.27      17.10    1.42x PASS(bad=0)
+  4096   4096        67.23      55.10    1.22x PASS(bad=0)
+  16384  4096       255.57     215.10    1.19x PASS(bad=3)
+  4096   7168       110.65      85.66    1.29x PASS(bad=3)
+  16384  7168       409.30     343.35    1.19x PASS(bad=5)
+  4096   8192       120.89      95.41    1.27x PASS(bad=1)
+  16384  8192       450.87     378.30    1.19x PASS(bad=4)
+rm bin/m5_lowprec/04_fused_rms_nvfp4

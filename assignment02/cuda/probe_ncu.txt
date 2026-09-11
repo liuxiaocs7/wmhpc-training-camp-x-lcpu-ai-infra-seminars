@@ -1,0 +1,94 @@
+==PROF== Connected to process 2368461 (/home/lcpu/27058528/wmhpc-training-camp-x-lcpu-ai-infra-seminars/assignment02/cuda/bin/m5_lowprec/03c_ceiling_probe)
+==PROF== Profiling "void probe_kernel<(int)256>(const __nv_bfloat16 *, unsigned char *, unsigned char *, int, int)": 0%....50%....100% - 16 passes
+M=4096   K=7168   probe    55.80 us    1348 GB/s
+M=16384  K=4096   probe   123.76 us    1390 GB/s
+M=16384  K=8192   probe   242.53 us    1418 GB/s
+==PROF== Disconnected from process 2368461
+[2368461] 03c_ceiling_probe@127.0.0.1
+  void probe_kernel<256>(const __nv_bfloat16 *, unsigned char *, unsigned char *, int, int) (888, 1, 1)x(256, 1, 1), Context 1, Stream 7, Device 0, CC 10.3
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz         3.99
+    SM Frequency                    Ghz         1.08
+    Elapsed Cycles                cycle        63911
+    Memory Throughput                 %        85.36
+    DRAM Throughput                   %        13.26
+    Duration                         us        58.75
+    L1/TEX Cache Throughput           %        96.08
+    L2 Cache Throughput               %        10.96
+    SM Active Cycles              cycle     57229.90
+    Compute (SM) Throughput           %        18.53
+    ----------------------- ----------- ------------
+
+    INF   This workload is utilizing greater than 80.0% of the available compute or memory performance of the device.   
+          To further improve performance, work will likely need to be shifted from the most utilized to another unit.   
+          Start by analyzing L1 in the Memory Workload Analysis section.                                                
+
+    Section: Memory Workload Analysis
+    -------------------------------------- ----------- ------------
+    Metric Name                            Metric Unit Metric Value
+    -------------------------------------- ----------- ------------
+    Local Memory Spilling Requests                                0
+    Local Memory Spilling Request Overhead           %      no data
+    Memory Throughput                          Tbyte/s         1.02
+    Mem Busy                                         %        85.36
+    Max Bandwidth                                    %        18.09
+    L1/TEX Hit Rate                                  %        90.90
+    L2 Persisting Size                           Mbyte        24.87
+    L2 Compression Success Rate                      %            0
+    L2 Compression Ratio                             %            0
+    L2 Compression Input Sectors                sector       460627
+    L2 Hit Rate                                      %        10.99
+    Mem Pipes Busy                                   %        10.90
+    -------------------------------------- ----------- ------------
+
+    Section: Scheduler Statistics
+    ---------------------------- ----------- ------------
+    Metric Name                  Metric Unit Metric Value
+    ---------------------------- ----------- ------------
+    One or More Eligible                   %        21.03
+    Issued Warp Per Scheduler                        0.21
+    No Eligible                            %        78.97
+    Active Warps Per Scheduler          warp        10.53
+    Eligible Warps Per Scheduler        warp         0.43
+    ---------------------------- ----------- ------------
+
+    OPT   Est. Local Speedup: 14.64%                                                                                    
+          Every scheduler is capable of issuing one instruction per cycle, but for this workload each scheduler only    
+          issues an instruction every 4.8 cycles. This might leave hardware resources underutilized and may lead to     
+          less optimal performance. Out of the maximum of 16 warps per scheduler, this workload allocates an average    
+          of 10.53 active warps per scheduler, but only an average of 0.43 warps were eligible per cycle. Eligible      
+          warps are the subset of active warps that are ready to issue their next instruction. Every cycle with no      
+          eligible warp results in no instruction being issued and the issue slot remains unused. To increase the       
+          number of eligible warps, reduce the time the active warps are stalled by inspecting the top stall reasons    
+          on the Warp State Statistics and Source Counters sections.                                                    
+
+    Section: Warp State Statistics
+    ---------------------------------------- ----------- ------------
+    Metric Name                              Metric Unit Metric Value
+    ---------------------------------------- ----------- ------------
+    Warp Cycles Per Issued Instruction             cycle        50.09
+    Warp Cycles Per Executed Instruction           cycle        50.09
+    Avg. Active Threads Per Warp                                   32
+    Avg. Not Predicated Off Threads Per Warp                    30.64
+    ---------------------------------------- ----------- ------------
+
+    WRN   The optional metric smsp__pcsamp_sample_count could not be found. Collecting it as an additional metric could 
+          enable the rule to provide more guidance.                                                                     
+    ----- --------------------------------------------------------------------------------------------------------------
+    OPT   Est. Speedup: 14.64%                                                                                          
+          On average, each warp of this workload spends 29.9 cycles being stalled waiting for a scoreboard dependency   
+          on a L1TEX (local, global, surface, texture) operation. Find the instruction producing the data being waited  
+          upon to identify the culprit. To reduce the number of cycles waiting on L1TEX data accesses verify the        
+          memory access patterns are optimal for the target architecture, attempt to increase cache hit rates by        
+          increasing data locality (coalescing), or by changing the cache configuration. Consider moving frequently     
+          used data to shared memory. This stall type represents about 59.7% of the total average of 50.1 cycles        
+          between issuing two instructions.                                                                             
+    ----- --------------------------------------------------------------------------------------------------------------
+    INF   Check the Warp Stall Sampling (All Samples) table for the top stall locations in your source based on         
+          sampling data. The Profiling Guide                                                                            
+          (https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-reference) provides more details    
+          on each stall reason.                                                                                         
+

@@ -27,13 +27,63 @@
 __device__ void load_manual(const uint8_t* sA, const uint8_t* sBk,
                             const uint8_t* sBn, unsigned (&a)[4],
                             unsigned (&b)[2]) {
-    (void)sA; (void)sBk; (void)sBn; (void)a; (void)b;
+    int lane = threadIdx.x;
+    int group = lane >> 2;
+    int tig = lane & 3;
+    
+    for (int r = 0; r < 4; r++) {
+        const int row = group + 8 * (r & 1);
+        const int k0 = 4 * tig + 16 * (r >> 1);
+        unsigned packed = 0;
+        for (int j = 0; j < 4; j++) {
+            const unsigned byte = static_cast<unsigned>(sA[row * 32 + k0 + j]);
+            packed |= byte << (8 * j);
+        }
+        a[r] = packed;
+    }
+
+    for (int r = 0; r < 2; r++) {
+        const int r0 = 4 * tig + 16 * r;
+        unsigned packed = 0;
+        for (int j = 0; j < 4; j++) {
+            const unsigned byte = static_cast<unsigned>(sBk[(r0 + j) * 8 + group]);
+            packed |= byte << (8 * j);
+        }
+        b[r] = packed;
+    }
 }
 
 __device__ void load_ldsm(const uint8_t* sA, const uint8_t* sBk,
                           const uint8_t* sBn, unsigned (&a)[4],
                           unsigned (&b)[2]) {
-    (void)sA; (void)sBk; (void)sBn; (void)a; (void)b;
+    const int lane = threadIdx.x & 31;
+
+    const int a_matrix = lane >> 3;
+    const int a_row_in_matrix = lane & 7;
+    const int a_row = a_row_in_matrix + 8 * (a_matrix & 1);
+    const int a_k_byte = 16 * (a_matrix >> 1);
+    const uint8_t* a_ptr = sA + a_row * 32 + a_k_byte;
+    const unsigned a_addr = static_cast<unsigned>(__cvta_generic_to_shared(a_ptr));
+
+    asm volatile(
+        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
+        "{%0,%1,%2,%3}, [%4];\n"
+        : "=r"(a[0]), "=r"(a[1]), "=r"(a[2]), "=r"(a[3])
+        : "r"(a_addr)
+    );
+
+    const int b_matrix = (lane >> 3) & 1;
+    const int b_n = lane & 7;
+    const int b_k_byte = 16 * b_matrix;
+    const uint8_t* b_ptr = sBn + b_n * 32 + b_k_byte;
+    const unsigned b_addr = static_cast<unsigned>(__cvta_generic_to_shared(b_ptr));
+
+    asm volatile(
+        "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
+        "{%0,%1}, [%2];\n"
+        : "=r"(b[0]), "=r"(b[1])
+        : "r"(b_addr)
+    );
 }
 
 template <bool USE_LDSM>

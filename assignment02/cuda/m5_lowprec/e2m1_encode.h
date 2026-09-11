@@ -16,6 +16,26 @@
 
 __host__ __device__ inline uint8_t e2m1_encode(float v) {
     // TODO: 实现。返回 4 bit 编码(bit3 符号,bit0-2 幅值格点下标)。
-    (void)v;
-    return 0;
+    const uint8_t sign = signbit(v) ? 0x8 : 0;
+    const float a = fabsf(v);
+
+    uint8_t magnitude;
+    if (a <= 0.25f)
+        magnitude = 0;
+    else if (a < 0.75f)
+        magnitude = 1;
+    else if (a <= 1.25f)
+        magnitude = 2;
+    else if (a < 1.75f)
+        magnitude = 3;
+    else if (a <= 2.5f)
+        magnitude = 4;
+    else if (a < 3.5f)
+        magnitude = 5;
+    else if (a <= 5.0f)
+        magnitude = 6;
+    else
+        magnitude = 7;
+
+    return sign | magnitude;
 }

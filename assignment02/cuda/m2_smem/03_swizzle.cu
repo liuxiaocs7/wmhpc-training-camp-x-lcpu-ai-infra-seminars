@@ -20,9 +20,50 @@
 #include <cstring>
 
 // TODO: 实现三个映射。
-static int swizzle_128B(int row, int colByte) { (void)row; return colByte; }
-static int swizzle_64B(int row, int colByte) { (void)row; return colByte; }
-static int swizzle_32B(int row, int colByte) { (void)row; return colByte; }
+static int swizzle_128B(int row, int colByte) {
+    // 写法1
+    // int t = row * 128 + colByte;
+    // int r = (t >> 7) & 0x7;
+    // int u = (t >> 4) & 0x7;
+    // u = u ^ r;
+    // int res = 0;
+    // res |= (r << 7);
+    // res |= (u << 4);
+    // res |= t & 0xf;
+    // return res;
+
+    return row * 128 + (colByte ^ ((row & 7) << 4));
+}
+
+static int swizzle_64B(int row, int colByte) {
+    // 写法1
+    // int t = row * 64 + colByte;
+    // int xor_r = (t >> 6) & 0x3;
+    // int u = (t >> 4) & 0x3;
+    // u = u ^ xor_r;
+    // int res = 0;
+    // res |= (t & 0x1c0);
+    // res |= (u << 4);
+    // res |= t & 0xf;
+    // return res;
+
+    return row * 64 + (colByte ^ ((row & 3) << 4));
+}
+
+static int swizzle_32B(int row, int colByte) {
+    // 写法1
+    // int t = row * 32 + colByte;
+    // int xor_r = (t >> 5) & 0x1;
+    // int u = (t >> 4) & 0x1;
+    // u = u ^ xor_r;
+    // int res = 0;
+    // res |= (t & 0xe0);
+    // res |= (u << 4);
+    // res |= t & 0xf;
+    // return res;
+
+    return row * 32 + (colByte ^ ((row & 1) << 4));
+}
 
 // 以下为判测,不需要修改。
 static int check_mode(const char* name, int (*fn)(int, int), int rowBytes,

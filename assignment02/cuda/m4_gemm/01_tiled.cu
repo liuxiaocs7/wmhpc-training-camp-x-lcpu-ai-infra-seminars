@@ -60,6 +60,8 @@ __global__ void gemm_tiled(const __nv_bfloat16* gA, const __nv_bfloat16* gB,
                            float* gD, int M, int N, int K) {
     // smem 用动态分配(main 已按 (BM+BN)*BK*2 + 1024 传入),基址对齐
     // 到 1024(swizzle atom 的要求);A 区 [0, BM*BK*2),B 区随后。
+    // 声明一块动态 shared memory，并把实际使用起点向上对齐到 1024 字节边界
+    // smem_raw 是这块内存的原始起始地址
     extern __shared__ uint8_t smem_raw[];
     uint8_t* smem =
         (uint8_t*)(((uintptr_t)smem_raw + 1023) & ~(uintptr_t)1023);
@@ -81,7 +83,148 @@ __global__ void gemm_tiled(const __nv_bfloat16* gA, const __nv_bfloat16* gB,
     //         小 K 可能侥幸通过,大 K 会读到被覆写的数据
     // (4) epilogue 与 3.2 相同,写回 gD 的 (tileM, tileN) 块(行跨度 N)
     // (5) dealloc
-    (void)gA; (void)gB; (void)gD; (void)M; (void)N; (void)K; (void)smem;
+
+    // (1) mbarrier 初始化 + TMEM 分配(与 3.2 相同,整段沿用)
+    int tid = threadIdx.x;
+    int warp = tid >> 5;
+    int lane = tid & 31;
+
+    // shared memory 地址
+    uint8_t* sA = smem;
+    uint8_t* sB = smem + BM * BK * 2;
+
+    __shared__ __align__(8) uint64_t mbar;
+    __shared__ uint32_t s_taddr;
+    uint32_t mbarAddr = (uint32_t)__cvta_generic_to_shared(&mbar);
+
+    if (warp == 0) {
+        // 初始化 mbarrier
+        if (lane == 0) {
+            asm volatile(
+                "mbarrier.init.shared::cta.b64 [%0], 1;"
+                :: "r"(mbarAddr)
+                : "memory");
+            asm volatile("fence.mbarrier_init.release.cluster;");
+        }
+        // 分配 tmem
+        uint32_t dst = (uint32_t)__cvta_generic_to_shared(&s_taddr);
+        asm volatile(
+            "tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 "
+            "[%0], %1;"
+            :: "r"(dst), "r"(BN));
+        asm volatile(
+            "tcgen05.relinquish_alloc_permit."
+            "cta_group::1.sync.aligned;");
+    }
+
+    // (2) 本 block 的输出 tile:tileM = blockIdx.x*BM, tileN = blockIdx.y*BN
+    const int tileM = blockIdx.x * BM;
+    const int tileN = blockIdx.y * BN;
+
+    __syncthreads();
+
+    uint32_t taddr = s_taddr;
+    uint32_t aBase = (uint32_t)__cvta_generic_to_shared(sA);
+    uint32_t bBase = (uint32_t)__cvta_generic_to_shared(sB);
+
+    uint32_t idesc =
+        (1u << 4)  |  // D = f32
+        (1u << 7)  |  // A = bf16
+        (1u << 10) |  // B = bf16
+        (8u << 17) |  // N = 64
+        (8u << 24);   // M = 128
+
+    for (int it = 0; it < K / BK; ++it) { // k维tile级循环
+        const int tileK = it * BK;
+
+        // A tile: [tileM : tileM + BM][tileK : tileK + BK]
+        for (int i = tid; i < BM * BK; i += blockDim.x) {
+            int localM = i / BK;
+            int localK = i % BK;
+
+            *reinterpret_cast<__nv_bfloat16*>(
+                &sA[swz128(localM, localK * 2)]) = 
+                gA[(size_t)(tileM + localM) * K + tileK + localK];
+        }
+
+        // B 按照 B[n][k] 保存
+        for (int i = tid; i < BN * BK; i += blockDim.x) {
+            int localN = i / BK;
+            int localK = i % BK;
+
+            *reinterpret_cast<__nv_bfloat16*>(
+                &sB[swz128(localN, localK * 2)]) = 
+                gB[(size_t)(tileN + localN) * K + tileK + localK];
+        }
+
+        asm volatile(
+            "fence.proxy.async.shared::cta;"
+            ::: "memory");
+        __syncthreads();
+
+        if (tid == 0) {
+            asm volatile("tcgen05.fence::after_thread_sync;");
+
+            for (int round = 0; round < 4; round++) {
+                int kk = round * 16;
+
+                uint64_t da = make_desc_sm100(aBase + kk * 2, 0, 1024, 2);
+                uint64_t db = make_desc_sm100(bBase + kk * 2, 0, 1024, 2);
+
+                // 整个 GEMM 只有第一条 MMA 不累加
+                uint32_t accumulate = (it != 0 || round != 0);
+
+                asm volatile(
+                    "{\n"
+                    ".reg .pred p;\n"
+                    "setp.ne.b32 p, %4, 0;\n"
+                    "tcgen05.mma.cta_group::1.kind::f16 "
+                    "[%0], %1, %2, %3, p;\n"
+                    "}"
+                    :
+                    : "r"(taddr), "l"(da), "l"(db),
+                      "r"(idesc), "r"(accumulate)
+                    : "memory");
+            }
+            asm volatile(
+                "tcgen05.commit.cta_group::1."
+                "mbarrier::arrive::one.shared::cluster.b64 "
+                "[%0];"
+                :: "r"(mbarAddr)
+                : "memory");
+        }
+        // 同一个 barrier 每轮 phase 翻转
+        mbar_wait(mbarAddr, it & 1);
+    }
+
+    asm volatile("tcgen05.fence::after_thread_sync;");
+    int row = warp * 32 + lane;
+    for (int c = 0; c < BN; c += 8) {
+        uint32_t src = taddr + ((uint32_t)(warp * 32) << 16) + c;
+        float r[8];
+
+        asm volatile(
+            "tcgen05.ld.sync.aligned.32x32b.x8.b32 "
+            "{%0,%1,%2,%3,%4,%5,%6,%7}, [%8];"
+            : "=f"(r[0]), "=f"(r[1]), "=f"(r[2]), "=f"(r[3]),
+              "=f"(r[4]), "=f"(r[5]), "=f"(r[6]), "=f"(r[7])
+            : "r"(src));
+
+        asm volatile("tcgen05.wait::ld.sync.aligned;");
+
+    #pragma unroll
+        for (int i = 0; i < 8; i++) {
+            gD[(size_t)(tileM + row) * N + tileN + c + i] = r[i];
+        }
+    }
+
+    __syncthreads();
+    if (warp == 0) {
+        asm volatile(
+            "tcgen05.dealloc.cta_group::1.sync.aligned.b32 "
+            "%0, %1;"
+            :: "r"(taddr), "r"(BN));
+    }
 }
 
 int main(int argc, char** argv) {
@@ -115,6 +258,7 @@ int main(int argc, char** argv) {
                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
                                     (int)smemBytes));
     auto launch = [&] {
+        // 第三个参数表示：动态 shared memory 大小
         gemm_tiled<<<grid, 128, smemBytes>>>(dA, dB, dD, M, N, K);
     };
     launch();
@@ -152,5 +296,9 @@ int main(int argc, char** argv) {
            M, N, K, bad ? "FAIL" : "PASS", bad, ms, tflops, cub_tflops,
            100.0 * tflops / cub_tflops);
     cublasDestroy(h);
+    CUDA_CHECK(cudaFree(dA));
+    CUDA_CHECK(cudaFree(dB));
+    CUDA_CHECK(cudaFree(dD));
+    CUDA_CHECK(cudaFree(dRef));
     return bad != 0;
 }
