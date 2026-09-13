@@ -1,0 +1,74 @@
+# from tvm.script import ir as I
+# from tvm.script import tirx as T
+
+@I.ir_module
+class Module:
+    @T.prim_func
+    def gemm(A_handle: T.handle, B_handle: T.handle, C_handle: T.handle):
+        T.func_attr({"target": T.target({"arch": "sm_100a", "host": {"keys": ["cpu"], "kind": "c", "tag": ""}, "keys": ["cuda", "gpu"], "kind": "cuda", "max_num_threads": 1024, "tag": "", "thread_warp_size": 32}), "tl.has_tma": T.bool(True), "tl.smem_alignment_map": {"A_shared": 1024, "B_shared": 1024}, "tl_tiled_ws_applied": 1})
+        A = T.match_buffer(A_handle, (1024, 1024), "bfloat16", strides=(1024, 1))
+        B = T.match_buffer(B_handle, (1024, 1024), "bfloat16", strides=(1024, 1))
+        C = T.match_buffer(C_handle, (1024, 1024), strides=(1024, 1))
+        bx = T.launch_thread("blockIdx.x", 8)
+        by = T.launch_thread("blockIdx.y", 8)
+        tx = T.launch_thread("threadIdx.x", 256)
+        ty = T.launch_thread("threadIdx.y", 1)
+        tz = T.launch_thread("threadIdx.z", 1)
+        mbarrier = T.alloc_buffer((6,), "uint64", scope="shared.barrier")
+        mbarrier_1 = T.decl_buffer((6,), "uint64", data=mbarrier.data, scope="shared.barrier")
+        A_shared = T.alloc_buffer((3, 1, 16, 512), "bfloat16", scope="shared.dyn")
+        A_shared_1 = T.decl_buffer((3, 1, 16, 512), "bfloat16", data=A_shared.data, scope="shared.dyn")
+        B_shared = T.alloc_buffer((3, 2, 8, 512), "bfloat16", scope="shared.dyn")
+        B_shared_1 = T.decl_buffer((3, 2, 8, 512), "bfloat16", data=B_shared.data, scope="shared.dyn")
+        C_local = T.alloc_buffer((128,), scope="local")
+        C_local_1 = T.decl_buffer((128,), data=C_local.data, scope="local")
+        if T.tl_shuffle_elect(0):
+            T.ptx_init_barrier_thread_count(mbarrier_1[0], 1)
+            T.ptx_init_barrier_thread_count(mbarrier_1[1], 1)
+            T.ptx_init_barrier_thread_count(mbarrier_1[2], 1)
+            T.ptx_init_barrier_thread_count(mbarrier_1[3], 128)
+            T.ptx_init_barrier_thread_count(mbarrier_1[4], 128)
+            T.ptx_init_barrier_thread_count(mbarrier_1[5], 128)
+        T.ptx_fence_barrier_init()
+        T.tvm_storage_sync("shared")
+        T.attr([128, 128], "kWarpSpecializationScope", 0)
+        if tx < 128:
+            for k in range(16):
+                T.mbarrier_wait_parity(mbarrier_1[k % 3 + 3], T.bitwise_xor(k % 6 // 3, 1))
+                if T.tl_shuffle_elect(128):
+                    T.mbarrier_expect_tx(mbarrier_1[k % 3], T.int64(16384))
+                    T.tma_load(T.create_tma_descriptor(9, 2, A.data, 1024, 1024, T.int64(2), T.int64(2048), 64, 128, 1, 1, 0, 3, 2, 0), mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared.data, k % 3 * 8192, 8192, 2), k * 64, by * 128, 0)
+                    T.ptx_arrive_barrier_expect_tx(mbarrier_1[k % 3], T.int64(16384))
+                    for i in T.unroll(2):
+                        T.tma_load(T.create_tma_descriptor(9, 2, B.data, 1024, 1024, T.int64(2), T.int64(2048), 64, 64, 1, 1, 0, 3, 2, 0), mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared.data, k % 3 * 8192 + i * 4096, 4096, 2), bx * 128 + i * 64, k * 64, 0)
+        else:
+            i = T.int32()
+            with T.attr(i, "pragma_unroll_explicit", T.bool(False)):
+                for i in T.unroll(32):
+                    for vec in T.vectorized(4):
+                        C_local_1[i * 4 + vec] = T.float32(0.0)
+            for k in range(16):
+                T.mbarrier_wait_parity(mbarrier_1[k % 3], k % 6 // 3)
+                with T.attr(0, "lexical_alloc_scope", 1):
+                    for ki in range(4):
+                        A_local = T.alloc_buffer((32,), "bfloat16", scope="local")
+                        A_local_1 = T.decl_buffer((32,), "bfloat16", data=A_local.data, scope="local")
+                        B_local = T.alloc_buffer((32,), "bfloat16", scope="local")
+                        B_local_1 = T.decl_buffer((32,), "bfloat16", data=B_local.data, scope="local")
+                        i_1 = T.int32()
+                        with T.attr(i_1, "pragma_unroll_explicit", T.bool(False)):
+                            for i_1 in T.unroll(4):
+                                T.ptx_ldmatrix(T.bool(False), 4, T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared.data, k % 3 * 8192 + tx % 64 // 32 * 4096 + i_1 * 1024 + (tx % 16 * 64 + ((ki * 16 + tx % 32 // 16 * 8) // 32 + tx % 8 // 4) % 2 * 32) // 512 * 512 + (tx % 16 * 64 + ((ki * 16 + tx % 32 // 16 * 8) // 32 + tx % 8 // 4) % 2 * 32 + (tx % 4 // 2 + ki % 2) % 2 * 16 + (tx % 32 // 16 + tx % 2) % 2 * 8) % 512, 8, 1), T.tvm_access_ptr(T.type_annotation("bfloat16"), A_local.data, i_1 * 8, 8, 2))
+                        i_2 = T.int32()
+                        with T.attr(i_2, "pragma_unroll_explicit", T.bool(False)):
+                            for i_2 in T.unroll(4):
+                                T.ptx_ldmatrix(T.bool(True), 4, T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared.data, k % 3 * 8192 + tx % 128 // 64 * 4096 + ki * 1024 + (tx % 16 * 64 + ((i_2 * 16 + tx % 32 // 16 * 8) // 32 + tx % 8 // 4) % 2 * 32) // 512 * 512 + (tx % 16 * 64 + ((i_2 * 16 + tx % 32 // 16 * 8) // 32 + tx % 8 // 4) % 2 * 32 + (tx % 4 // 2 + i_2 % 2) % 2 * 16 + (tx % 32 // 16 + tx % 2) % 2 * 8) % 512, 8, 1), T.tvm_access_ptr(T.type_annotation("bfloat16"), B_local.data, i_2 * 8, 8, 2))
+                        for i_3, j in T.grid(4, 4):
+                            T.ptx_mma("float32", "m16n8k16", "row", "col", "bf16", "bf16", "fp32", A_local.data, i_3 * 8, B_local.data, j * 8, C_local.data, i_3 * 32 + j * 8, T.bool(False))
+                            T.ptx_mma("float32", "m16n8k16", "row", "col", "bf16", "bf16", "fp32", A_local.data, i_3 * 8, B_local.data, j * 8 + 4, C_local.data, i_3 * 32 + j * 8 + 4, T.bool(False))
+                T.ptx_arrive_barrier(mbarrier_1[k % 3 + 3])
+            i_1 = T.int32()
+            T.attr(i_1, "pragma_unroll_explicit", T.bool(False))
+            for i_1 in T.unroll(64):
+                for vec in T.vectorized(2):
+                    C[by * 128 + tx % 64 // 32 * 64 + i_1 // 16 * 16 + i_1 % 2 * 8 + tx % 32 // 4, bx * 128 + tx // 64 * 64 + i_1 % 16 // 2 * 8 + tx % 4 * 2 + vec - 128] = C_local_1[i_1 * 2 + vec]

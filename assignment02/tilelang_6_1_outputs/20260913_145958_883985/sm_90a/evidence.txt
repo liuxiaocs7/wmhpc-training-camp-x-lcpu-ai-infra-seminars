@@ -1,0 +1,197 @@
+kernel.cu:8: #include <tl_templates/cuda/instruction/wgmma.h>
+kernel.cu:15: #include <tl_templates/cuda/threadblock_swizzle.h>
+kernel.cu:21: extern "C" __global__ void gemm_kernel(__grid_constant__ const CUtensorMap A_desc, __grid_constant__ const CUtensorMap B_desc, float* __restrict__ C);
+kernel.cu:22: extern "C" __global__ void __launch_bounds__(256, 1) gemm_kernel(__grid_constant__ const CUtensorMap A_desc, __grid_constant__ const CUtensorMap B_desc, float* __restrict__ C) {
+kernel.cu:26:   __shared__ __align__(16) uint64_t mbarrier_mem[6];
+kernel.cu:27:   auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
+kernel.cu:30:     tl::prefetch_tma_descriptor(A_desc);
+kernel.cu:31:     tl::prefetch_tma_descriptor(B_desc);
+kernel.cu:34:     mbarrier[0].init(1);
+kernel.cu:35:     mbarrier[1].init(1);
+kernel.cu:36:     mbarrier[2].init(1);
+kernel.cu:37:     mbarrier[3].init(128);
+kernel.cu:38:     mbarrier[4].init(128);
+kernel.cu:39:     mbarrier[5].init(128);
+kernel.cu:46:       mbarrier[((k % 3) + 3)].wait((((k % 6) / 3) ^ 1));
+kernel.cu:48:         mbarrier[(k % 3)].expect_transaction(16384);
+kernel.cu:49:         tl::tma_load(A_desc, mbarrier[(k % 3)], (&(((bfloat16_t*)A_shared)[((k % 3) * 8192)])), (k * 64), (((int)blockIdx.y) * 128));
+kernel.cu:50:         mbarrier[(k % 3)].arrive_and_expect_tx(16384);
+kernel.cu:51:         tl::tma_load(B_desc, mbarrier[(k % 3)], (&(((bfloat16_t*)B_shared)[((k % 3) * 8192)])), (((int)blockIdx.x) * 128), (k * 64));
+kernel.cu:52:         tl::tma_load(B_desc, mbarrier[(k % 3)], (&(((bfloat16_t*)B_shared)[(((k % 3) * 8192) + 4096)])), ((((int)blockIdx.x) * 128) + 64), (k * 64));
+kernel.cu:63:       mbarrier[(k_1 % 3)].wait(((k_1 % 6) / 3));
+kernel.cu:65:         tl::GmmaDescriptor desc_a;
+kernel.cu:66:         tl::GmmaDescriptor desc_b;
+kernel.cu:67:         tl::initialize_wgmma_descriptor<1, 1, 64>(desc_a, (&(((bfloat16_t*)A_shared)[0])));
+kernel.cu:68:         tl::increase_descriptor_offset<int>(desc_a, ((k_1 % 3) * 16384));
+kernel.cu:69:         tl::initialize_wgmma_descriptor<1, 512, 64>(desc_b, (&(((bfloat16_t*)B_shared)[0])));
+kernel.cu:70:         tl::increase_descriptor_offset<int>(desc_b, ((k_1 % 3) * 16384));
+kernel.cu:77:             tl::wgmma_ss<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 64, 128, 16, false, true, 1, 1>(uint64_t(desc_a + (((i_1 * 8192) + (ki * 32)) >> 4)), uint64_t(desc_b + ((ki * 2048) >> 4)), ((uint32_t*)(C_local + (i_1 * 64))), 1);
+kernel.cu:84:       mbarrier[((k_1 % 3) + 3)].arrive();
+kernel.ptx:14: // _ZZ11gemm_kernelE12mbarrier_mem has been demoted
+kernel.ptx:31: 	.shared .align 16 .b8 _ZZ11gemm_kernelE12mbarrier_mem[48];
+kernel.ptx:59: 	prefetch.tensormap [%rd9];
+kernel.ptx:63: 	prefetch.tensormap [%rd10];
+kernel.ptx:87: 	mov.u32 	%r23, _ZZ11gemm_kernelE12mbarrier_mem;
+kernel.ptx:89: 	mbarrier.init.shared::cta.b64 [%r23], %r26;
+kernel.ptx:93: 	mbarrier.init.shared::cta.b64 [%r25], %r26;
+kernel.ptx:97: 	mbarrier.init.shared::cta.b64 [%r27], %r26;
+kernel.ptx:102: 	mbarrier.init.shared::cta.b64 [%r29], %r32;
+kernel.ptx:106: 	mbarrier.init.shared::cta.b64 [%r31], %r32;
+kernel.ptx:110: 	mbarrier.init.shared::cta.b64 [%r33], %r32;
+kernel.ptx:116: 	fence.mbarrier_init.release.cluster;
+kernel.ptx:125: 	setmaxnreg.dec.sync.aligned.u32 24;
+kernel.ptx:138: 	mov.u32 	%r137, _ZZ11gemm_kernelE12mbarrier_mem;
+kernel.ptx:146: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r127], %r128, %r129; 
+kernel.ptx:171: 	mbarrier.expect_tx.shared::cta.b64 [%r137], %r144;
+kernel.ptx:176: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r140], [%rd4, {%r157, %r5}], [%r137], %rd50;
+kernel.ptx:179: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r137], %r144;
+kernel.ptx:183: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r146], [%rd5, {%r6, %r157}], [%r137], %rd50;
+kernel.ptx:187: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r150], [%rd5, {%r7, %r157}], [%r137], %rd50;
+kernel.ptx:196: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r154], %r128, %r129; 
+kernel.ptx:220: 	mbarrier.expect_tx.shared::cta.b64 [%r176], %r169;
+kernel.ptx:227: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r165], [%rd4, {%r178, %r5}], [%r176], %rd56;
+kernel.ptx:230: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r176], %r169;
+kernel.ptx:234: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r171], [%rd5, {%r6, %r178}], [%r176], %rd56;
+kernel.ptx:238: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r175], [%rd5, {%r7, %r178}], [%r176], %rd56;
+kernel.ptx:250: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r181], %r182, %r183; 
+kernel.ptx:276: 	mbarrier.expect_tx.shared::cta.b64 [%r203], %r196;
+kernel.ptx:283: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r192], [%rd4, {%r205, %r5}], [%r203], %rd62;
+kernel.ptx:286: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r203], %r196;
+kernel.ptx:290: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r198], [%rd5, {%r6, %r205}], [%r203], %rd62;
+kernel.ptx:294: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r202], [%rd5, {%r7, %r205}], [%r203], %rd62;
+kernel.ptx:302: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r127], %r211, %r183; 
+kernel.ptx:325: 	mbarrier.expect_tx.shared::cta.b64 [%r137], %r223;
+kernel.ptx:331: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r219], [%rd4, {%r232, %r5}], [%r137], %rd68;
+kernel.ptx:334: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r137], %r223;
+kernel.ptx:338: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r225], [%rd5, {%r6, %r232}], [%r137], %rd68;
+kernel.ptx:342: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r229], [%rd5, {%r7, %r232}], [%r137], %rd68;
+kernel.ptx:352: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r154], %r263, %r235; 
+kernel.ptx:378: 	mbarrier.expect_tx.shared::cta.b64 [%r255], %r248;
+kernel.ptx:385: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r244], [%rd4, {%r257, %r5}], [%r255], %rd74;
+kernel.ptx:388: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r255], %r248;
+kernel.ptx:392: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r250], [%rd5, {%r6, %r257}], [%r255], %rd74;
+kernel.ptx:396: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r254], [%rd5, {%r7, %r257}], [%r255], %rd74;
+kernel.ptx:404: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r181], %r263, %r235; 
+kernel.ptx:428: 	mbarrier.expect_tx.shared::cta.b64 [%r282], %r275;
+kernel.ptx:435: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r271], [%rd4, {%r284, %r5}], [%r282], %rd80;
+kernel.ptx:438: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r282], %r275;
+kernel.ptx:442: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r277], [%rd5, {%r6, %r284}], [%r282], %rd80;
+kernel.ptx:446: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r281], [%rd5, {%r7, %r284}], [%r282], %rd80;
+kernel.ptx:457: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r127], %r288, %r289; 
+kernel.ptx:482: 	mbarrier.expect_tx.shared::cta.b64 [%r137], %r302;
+kernel.ptx:488: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r298], [%rd4, {%r311, %r5}], [%r137], %rd86;
+kernel.ptx:491: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r137], %r302;
+kernel.ptx:495: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r304], [%rd5, {%r6, %r311}], [%r137], %rd86;
+kernel.ptx:499: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r308], [%rd5, {%r7, %r311}], [%r137], %rd86;
+kernel.ptx:507: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r154], %r288, %r289; 
+kernel.ptx:531: 	mbarrier.expect_tx.shared::cta.b64 [%r334], %r327;
+kernel.ptx:538: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r323], [%rd4, {%r336, %r5}], [%r334], %rd92;
+kernel.ptx:541: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r334], %r327;
+kernel.ptx:545: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r329], [%rd5, {%r6, %r336}], [%r334], %rd92;
+kernel.ptx:549: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r333], [%rd5, {%r7, %r336}], [%r334], %rd92;
+kernel.ptx:560: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r181], %r340, %r341; 
+kernel.ptx:586: 	mbarrier.expect_tx.shared::cta.b64 [%r361], %r354;
+kernel.ptx:593: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r350], [%rd4, {%r363, %r5}], [%r361], %rd98;
+kernel.ptx:596: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r361], %r354;
+kernel.ptx:600: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r356], [%rd5, {%r6, %r363}], [%r361], %rd98;
+kernel.ptx:604: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r360], [%rd5, {%r7, %r363}], [%r361], %rd98;
+kernel.ptx:612: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r127], %r369, %r341; 
+kernel.ptx:635: 	mbarrier.expect_tx.shared::cta.b64 [%r137], %r381;
+kernel.ptx:641: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r377], [%rd4, {%r390, %r5}], [%r137], %rd104;
+kernel.ptx:644: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r137], %r381;
+kernel.ptx:648: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r383], [%rd5, {%r6, %r390}], [%r137], %rd104;
+kernel.ptx:652: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r387], [%rd5, {%r7, %r390}], [%r137], %rd104;
+kernel.ptx:662: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r154], %r421, %r393; 
+kernel.ptx:688: 	mbarrier.expect_tx.shared::cta.b64 [%r413], %r406;
+kernel.ptx:695: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r402], [%rd4, {%r415, %r5}], [%r413], %rd110;
+kernel.ptx:698: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r413], %r406;
+kernel.ptx:702: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r408], [%rd5, {%r6, %r415}], [%r413], %rd110;
+kernel.ptx:706: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r412], [%rd5, {%r7, %r415}], [%r413], %rd110;
+kernel.ptx:714: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r181], %r421, %r393; 
+kernel.ptx:738: 	mbarrier.expect_tx.shared::cta.b64 [%r440], %r433;
+kernel.ptx:745: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r429], [%rd4, {%r442, %r5}], [%r440], %rd116;
+kernel.ptx:748: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r440], %r433;
+kernel.ptx:752: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r435], [%rd5, {%r6, %r442}], [%r440], %rd116;
+kernel.ptx:756: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r439], [%rd5, {%r7, %r442}], [%r440], %rd116;
+kernel.ptx:767: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r127], %r446, %r447; 
+kernel.ptx:792: 	mbarrier.expect_tx.shared::cta.b64 [%r137], %r460;
+kernel.ptx:798: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r456], [%rd4, {%r469, %r5}], [%r137], %rd122;
+kernel.ptx:801: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r137], %r460;
+kernel.ptx:805: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r462], [%rd5, {%r6, %r469}], [%r137], %rd122;
+kernel.ptx:809: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r466], [%rd5, {%r7, %r469}], [%r137], %rd122;
+kernel.ptx:817: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r154], %r446, %r447; 
+kernel.ptx:841: 	mbarrier.expect_tx.shared::cta.b64 [%r492], %r485;
+kernel.ptx:848: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r481], [%rd4, {%r494, %r5}], [%r492], %rd128;
+kernel.ptx:851: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r492], %r485;
+kernel.ptx:855: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r487], [%rd5, {%r6, %r494}], [%r492], %rd128;
+kernel.ptx:859: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r491], [%rd5, {%r7, %r494}], [%r492], %rd128;
+kernel.ptx:870: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r181], %r498, %r499; 
+kernel.ptx:896: 	mbarrier.expect_tx.shared::cta.b64 [%r519], %r512;
+kernel.ptx:903: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r508], [%rd4, {%r521, %r5}], [%r519], %rd134;
+kernel.ptx:906: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r519], %r512;
+kernel.ptx:910: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r514], [%rd5, {%r6, %r521}], [%r519], %rd134;
+kernel.ptx:914: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r518], [%rd5, {%r7, %r521}], [%r519], %rd134;
+kernel.ptx:922: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r127], %r527, %r499; 
+kernel.ptx:945: 	mbarrier.expect_tx.shared::cta.b64 [%r137], %r539;
+kernel.ptx:951: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r535], [%rd4, {%r548, %r5}], [%r137], %rd140;
+kernel.ptx:954: 	mbarrier.arrive.expect_tx.shared::cta.b64 _, [%r137], %r539;
+kernel.ptx:958: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r541], [%rd5, {%r6, %r548}], [%r137], %rd140;
+kernel.ptx:962: 	cp.async.bulk.tensor.2d.shared::cta.global.mbarrier::complete_tx::bytes.L2::cache_hint [%r545], [%rd5, {%r7, %r548}], [%r137], %rd140;
+kernel.ptx:968: 	setmaxnreg.inc.sync.aligned.u32 240;
+kernel.ptx:973: 	mov.u32 	%r64, _ZZ11gemm_kernelE12mbarrier_mem;
+kernel.ptx:1124: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r35], %r36, %r49; 
+kernel.ptx:1399: 	wgmma.fence.sync.aligned;
+kernel.ptx:1412: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd11, %rd20, p,    1,  1,  0,  1;
+kernel.ptx:1426: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd13, %rd22, p,    1,  1,  0,  1;
+kernel.ptx:1440: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd15, %rd24, p,    1,  1,  0,  1;
+kernel.ptx:1454: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd17, %rd26, p,    1,  1,  0,  1;
+kernel.ptx:1465: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd19, %rd20, p,    1,  1,  0,  1;
+kernel.ptx:1476: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd21, %rd22, p,    1,  1,  0,  1;
+kernel.ptx:1487: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd23, %rd24, p,    1,  1,  0,  1;
+kernel.ptx:1498: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd25, %rd26, p,    1,  1,  0,  1;
+kernel.ptx:1503: 	wgmma.commit_group.sync.aligned;
+kernel.ptx:1507: 	wgmma.wait_group.sync.aligned 0;
+kernel.ptx:1768: 	mbarrier.arrive.shared::cta.b64 _, [%r46];
+kernel.ptx:1789: 	mbarrier.try_wait.parity.shared::cta.b64 P1, [%r47], %r48, %r49; 
+kernel.ptx:2053: 	wgmma.fence.sync.aligned;
+kernel.ptx:2064: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd27, %rd36, p,    1,  1,  0,  1;
+kernel.ptx:2076: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd29, %rd38, p,    1,  1,  0,  1;
+kernel.ptx:2088: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd31, %rd40, p,    1,  1,  0,  1;
+kernel.ptx:2100: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3584,   %f3583,   %f3582,   %f3581,   %f3580,   %f3579,   %f3578,   %f3577,    %f3576,   %f3575,   %f3574,  %f3573,  %f3572,  %f3571,  %f3570,  %f3569,   %f3568,  %f3567,  %f3566,  %f3565,  %f3564,  %f3563,  %f3562,  %f3561,   %f3560,  %f3559,  %f3558,  %f3557,  %f3556,  %f3555,  %f3554,  %f3553,   %f3552,  %f3551,  %f3550,  %f3549,  %f3548,  %f3547,  %f3546,  %f3545,   %f3544,  %f3543,  %f3542,  %f3541,  %f3540,  %f3539,  %f3538,  %f3537,   %f3536,  %f3535,  %f3534,  %f3533,  %f3532,  %f3531,  %f3530,  %f3529,   %f3528,  %f3527,  %f3526,  %f3525,  %f3524,  %f3523,  %f3522,  %f3521}, %rd33, %rd42, p,    1,  1,  0,  1;
+kernel.ptx:2110: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd35, %rd36, p,    1,  1,  0,  1;
+kernel.ptx:2120: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd37, %rd38, p,    1,  1,  0,  1;
+kernel.ptx:2130: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd39, %rd40, p,    1,  1,  0,  1;
+kernel.ptx:2140: wgmma.mma_async.sync.aligned.m64n128k16.f32.bf16.bf16 {%f3520,   %f3519,   %f3518,   %f3517,   %f3516,   %f3515,   %f3514,   %f3513,    %f3512,   %f3511,   %f3510,  %f3509,  %f3508,  %f3507,  %f3506,  %f3505,   %f3504,  %f3503,  %f3502,  %f3501,  %f3500,  %f3499,  %f3498,  %f3497,   %f3496,  %f3495,  %f3494,  %f3493,  %f3492,  %f3491,  %f3490,  %f3489,   %f3488,  %f3487,  %f3486,  %f3485,  %f3484,  %f3483,  %f3482,  %f3481,   %f3480,  %f3479,  %f3478,  %f3477,  %f3476,  %f3475,  %f3474,  %f3473,   %f3472,  %f3471,  %f3470,  %f3469,  %f3468,  %f3467,  %f3466,  %f3465,   %f3464,  %f3463,  %f3462,  %f3461,  %f3460,  %f3459,  %f3458,  %f3457}, %rd41, %rd42, p,    1,  1,  0,  1;
+kernel.ptx:2145: 	wgmma.commit_group.sync.aligned;
+kernel.ptx:2149: 	wgmma.wait_group.sync.aligned 0;
+kernel.ptx:2410: 	mbarrier.arrive.shared::cta.b64 _, [%r58];
+host_ir.txt:12:         T.func_attr({"calling_conv": 1, "global_symbol": "__tvm_ffi_gemm", "target": T.target({"keys": ["cpu"], "kind": "c", "tag": ""}), "thread_extent": {}, "tirx.is_entry_func": True, "tl.has_tma": T.bool(True), "tl.readonly_param_indices": [0, 1, 2], "tl_tiled_ws_applied": 1, "tma_descriptor_args": {A_desc: ["__tvm_tensormap_create_tiled", A_desc, 9, 2, A, 1024, 1024, 2, 2048, 64, 128, 1, 1, 0, 3, 2, 0], B_desc: ["__tvm_tensormap_create_tiled", B_desc, 9, 2, B, 1024, 1024, 2, 2048, 64, 64, 1, 1, 0, 3, 2, 0]}})
+host_ir.txt:86:             T.call_packed("__tvm_tensormap_create_tiled", A_desc, 9, 2, A, 1024, 1024, 2, 2048, 64, 128, 1, 1, 0, 3, 2, 0)
+host_ir.txt:88:             T.call_packed("__tvm_tensormap_create_tiled", B_desc, 9, 2, B, 1024, 1024, 2, 2048, 64, 64, 1, 1, 0, 3, 2, 0)
+device_ir.txt:14:         mbarrier = T.alloc_buffer((6,), "uint64", scope="shared.barrier")
+device_ir.txt:19:             T.prefetch_tma_descriptor(A_desc)
+device_ir.txt:20:             T.prefetch_tma_descriptor(B_desc)
+device_ir.txt:23:         mbarrier_1 = T.decl_buffer((6,), "uint64", data=mbarrier.data, scope="shared.barrier")
+device_ir.txt:26:             T.ptx_init_barrier_thread_count(mbarrier_1[0], 1)
+device_ir.txt:27:             T.ptx_init_barrier_thread_count(mbarrier_1[1], 1)
+device_ir.txt:28:             T.ptx_init_barrier_thread_count(mbarrier_1[2], 1)
+device_ir.txt:29:             T.ptx_init_barrier_thread_count(mbarrier_1[3], 128)
+device_ir.txt:30:             T.ptx_init_barrier_thread_count(mbarrier_1[4], 128)
+device_ir.txt:31:             T.ptx_init_barrier_thread_count(mbarrier_1[5], 128)
+device_ir.txt:38:                 T.mbarrier_wait_parity(mbarrier_1[k % 3 + 3], T.bitwise_xor(k % 6 // 3, 1))
+device_ir.txt:40:                     T.mbarrier_expect_tx(mbarrier_1[k % 3], 16384)
+device_ir.txt:41:                     T.tma_load(A_desc, mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared, k % 3 * 8192, 8192, 2), k * 64, by * 128, 0)
+device_ir.txt:42:                     T.ptx_arrive_barrier_expect_tx(mbarrier_1[k % 3], 16384)
+device_ir.txt:43:                     T.tma_load(B_desc, mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared, k % 3 * 8192, 4096, 2), bx * 128, k * 64, 0)
+device_ir.txt:44:                     T.tma_load(B_desc, mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared, k % 3 * 8192 + 4096, 4096, 2), bx * 128 + 64, k * 64, 0)
+device_ir.txt:50:                 T.mbarrier_wait_parity(mbarrier_1[k % 3], k % 6 // 3)
+device_ir.txt:52:                     desc_a = T.alloc_buffer((1,), "uint64", scope="local.descriptor.wgmma")
+device_ir.txt:53:                     desc_b = T.alloc_buffer((1,), "uint64", scope="local.descriptor.wgmma")
+device_ir.txt:54:                     desc_a_1 = T.decl_buffer((1,), "uint64", data=desc_a.data, scope="local.descriptor.wgmma")
+device_ir.txt:55:                     desc_b_1 = T.decl_buffer((1,), "uint64", data=desc_b.data, scope="local.descriptor.wgmma")
+device_ir.txt:56:                     T.initialize_wgmma_descriptor(desc_a_1[0], T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared, 0, 24576, 1), 1, 1, 64)
+device_ir.txt:57:                     T.increase_descriptor_offset(desc_a_1[0], k % 3 * 16384)
+device_ir.txt:58:                     T.initialize_wgmma_descriptor(desc_b_1[0], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared, 0, 24576, 1), 1, 512, 64)
+device_ir.txt:59:                     T.increase_descriptor_offset(desc_b_1[0], k % 3 * 16384)
+device_ir.txt:64:                             T.ptx_wgmma_ss("m64n128k16", T.bool(True), T.bool(False), "bf16", "bf16", "fp32", desc_a.data, T.shift_right(i * 8192 + ki * 32, 4), desc_b.data, T.shift_right(ki * 2048, 4), C_local.data, i * 64, 1, 1, 1)
+device_ir.txt:68:                 T.ptx_arrive_barrier(mbarrier_1[k % 3 + 3])

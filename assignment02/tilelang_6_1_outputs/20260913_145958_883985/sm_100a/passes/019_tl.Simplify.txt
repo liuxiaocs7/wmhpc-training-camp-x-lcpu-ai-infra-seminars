@@ -1,0 +1,23 @@
+# from tvm.script import ir as I
+# from tvm.script import tirx as T
+
+@I.ir_module
+class Module:
+    @T.prim_func
+    def _gemm_ssr():
+        # with T.sblock("root"):
+        A_local = T.sblock_alloc_buffer((32,), "bfloat16", scope="local")
+        B_local = T.sblock_alloc_buffer((32,), "bfloat16", scope="local")
+        for ki in range(4):
+            k = T.int32()
+            tx = T.int32()
+            for i in T.unroll(4, annotations={"pragma_unroll_explicit": False}):
+                A_shared = T.Buffer((3, 128, 64), "bfloat16", scope="shared.dyn")
+                T.ptx_ldmatrix(T.bool(False), 4, T.access_ptr(A_shared[k % 3, tx % 64 // 32 * 64 + i * 16 + tx % 16, ki * 16 + tx % 32 // 16 * 8], 8, 1), T.access_ptr(A_local[i * 8], 8, 2))
+            for i in T.unroll(4, annotations={"pragma_unroll_explicit": False}):
+                B_shared = T.Buffer((3, 64, 128), "bfloat16", scope="shared.dyn")
+                T.ptx_ldmatrix(T.bool(True), 4, T.access_ptr(B_shared[k % 3, ki * 16 + tx % 16, tx % 128 // 64 * 64 + i * 16 + tx % 32 // 16 * 8], 8, 1), T.access_ptr(B_local[i * 8], 8, 2))
+            for i, j in T.grid(4, 4):
+                C_local = T.handle("float32", "local.fragment")
+                T.ptx_mma("float32", "m16n8k16", "row", "col", "bf16", "bf16", "fp32", A_local.data, i * 8, B_local.data, j * 8, C_local, i * 32 + j * 8, T.bool(False))
+                T.ptx_mma("float32", "m16n8k16", "row", "col", "bf16", "bf16", "fp32", A_local.data, i * 8, B_local.data, j * 8 + 4, C_local, i * 32 + j * 8 + 4, T.bool(False))

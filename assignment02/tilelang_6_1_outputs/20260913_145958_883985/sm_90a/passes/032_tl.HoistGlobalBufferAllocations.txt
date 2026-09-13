@@ -1,0 +1,82 @@
+# from tvm.script import ir as I
+# from tvm.script import tirx as T
+
+@I.ir_module
+class Module:
+    @T.prim_func
+    def gemm(A_handle: T.handle, B_handle: T.handle, C_handle: T.handle):
+        T.func_attr({"target": T.target({"arch": "sm_90a", "host": {"keys": ["cpu"], "kind": "c", "tag": ""}, "keys": ["cuda", "gpu"], "kind": "cuda", "max_num_threads": 1024, "tag": "", "thread_warp_size": 32}), "tl.has_tma": T.bool(True), "tl.smem_alignment_map": {"A_shared": 1024, "B_shared": 1024}, "tl_tiled_ws_applied": 1})
+        A = T.match_buffer(A_handle, (1024, 1024), "bfloat16", strides=(1024, 1))
+        B = T.match_buffer(B_handle, (1024, 1024), "bfloat16", strides=(1024, 1))
+        C = T.match_buffer(C_handle, (1024, 1024), strides=(1024, 1))
+        with T.sblock("root"):
+            T.reads()
+            T.writes()
+            A_shared = T.Buffer((3, 1, 16, 512), "bfloat16", scope="shared.dyn")
+            B_shared = T.Buffer((3, 2, 8, 512), "bfloat16", scope="shared.dyn")
+            C_local = T.Buffer((128,), scope="local")
+            T.sblock_attr({"layout_map": {A_shared: metadata["tl.Layout"][0], B_shared: metadata["tl.Layout"][1], C_local: metadata["tl.Fragment"][0]}})
+            bx = T.launch_thread("blockIdx.x", 8)
+            by = T.launch_thread("blockIdx.y", 8)
+            tx = T.launch_thread("threadIdx.x", 256)
+            ty = T.launch_thread("threadIdx.y", 1)
+            tz = T.launch_thread("threadIdx.z", 1)
+            with T.sblock("tilelang_root"):
+                T.reads()
+                T.writes()
+                mbarrier = T.handle("uint64", "shared.barrier")
+                T.sblock_attr({"barrier_init": {mbarrier: [1, 1, 1, 128, 128, 128]}, "layout_map": {A_shared: metadata["tl.Layout"][0], B_shared: metadata["tl.Layout"][1], C_local: metadata["tl.Fragment"][0]}})
+                mbarrier_1 = T.sblock_alloc_buffer((6,), "uint64", data=mbarrier, scope="shared.barrier")
+                A_shared = T.sblock_alloc_buffer((3, 1, 16, 512), "bfloat16", data=A_shared.data, scope="shared.dyn")
+                B_shared = T.sblock_alloc_buffer((3, 2, 8, 512), "bfloat16", data=B_shared.data, scope="shared.dyn")
+                C_local = T.sblock_alloc_buffer((128,), data=C_local.data, scope="local")
+                if T.tl_shuffle_elect(0):
+                    T.ptx_init_barrier_thread_count(mbarrier_1[0], 1)
+                    T.ptx_init_barrier_thread_count(mbarrier_1[1], 1)
+                    T.ptx_init_barrier_thread_count(mbarrier_1[2], 1)
+                    T.ptx_init_barrier_thread_count(mbarrier_1[3], 128)
+                    T.ptx_init_barrier_thread_count(mbarrier_1[4], 128)
+                    T.ptx_init_barrier_thread_count(mbarrier_1[5], 128)
+                T.ptx_fence_barrier_init()
+                T.tvm_storage_sync("shared")
+                T.attr([128, 128], "kWarpSpecializationScope", 0)
+                if tx < 128:
+                    for k in range(16):
+                        T.mbarrier_wait_parity(mbarrier_1[k % 3 + 3], T.bitwise_xor(k % 6 // 3, 1))
+                        if T.tl_shuffle_elect(128):
+                            T.mbarrier_expect_tx(mbarrier_1[k % 3], T.int64(16384))
+                            T.tma_load(T.create_tma_descriptor(9, 2, A.data, 1024, 1024, T.int64(2), T.int64(2048), 64, 128, 1, 1, 0, 3, 2, 0), mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared.data, k % 3 * 8192, 8192, 2), k * 64, by * 128, 0)
+                            T.ptx_arrive_barrier_expect_tx(mbarrier_1[k % 3], T.int64(16384))
+                            for i in T.unroll(2):
+                                T.tma_load(T.create_tma_descriptor(9, 2, B.data, 1024, 1024, T.int64(2), T.int64(2048), 64, 64, 1, 1, 0, 3, 2, 0), mbarrier_1[k % 3], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared.data, k % 3 * 8192 + i * 4096, 4096, 2), bx * 128 + i * 64, k * 64, 0)
+                else:
+                    for i in T.unroll(32, annotations={"pragma_unroll_explicit": T.bool(False)}):
+                        for vec in T.vectorized(4):
+                            C_local[i * 4 + vec] = T.float32(0.0)
+                    for k in range(16):
+                        T.mbarrier_wait_parity(mbarrier_1[k % 3], k % 6 // 3)
+                        with T.sblock("_gemm_ssr"):
+                            T.reads()
+                            T.writes()
+                            T.sblock_attr({"lexical_alloc_scope": 1})
+                            desc_a = T.sblock_alloc_buffer((1,), "uint64", scope="local.descriptor.wgmma")
+                            desc_b = T.sblock_alloc_buffer((1,), "uint64", scope="local.descriptor.wgmma")
+                            T.initialize_wgmma_descriptor(desc_a[0], T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared.data, 0, 24576, 1), 1, 1, 64)
+                            T.increase_descriptor_offset(desc_a[0], k % 3 * 16384)
+                            T.initialize_wgmma_descriptor(desc_b[0], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared.data, 0, 24576, 1), 1, 512, 64)
+                            T.increase_descriptor_offset(desc_b[0], k % 3 * 16384)
+                            T.warpgroup_fence_operand("float32", C_local.data, 0, 128)
+                            T.warpgroup_arrive()
+                            for warp_j in T.unroll(1, annotations={"pragma_unroll_explicit": False}):
+                                for i in T.unroll(2, annotations={"pragma_unroll_explicit": False}):
+                                    for ki in T.unroll(4, annotations={"pragma_unroll_explicit": False}):
+                                        T.ptx_wgmma_ss("m64n128k16", T.bool(True), T.bool(False), "bf16", "bf16", "fp32", desc_a.data, T.shift_right(i * 8192 + ki * 32, 4), desc_b.data, T.shift_right(ki * 2048, 4), C_local.data, i * 64, 1, 1, 1)
+                            T.warpgroup_commit_batch()
+                            T.warpgroup_wait(0)
+                            T.warpgroup_fence_operand("float32", C_local.data, 0, 128)
+                        T.ptx_arrive_barrier(mbarrier_1[k % 3 + 3])
+                    for i in T.unroll(64, annotations={"pragma_unroll_explicit": T.bool(False)}):
+                        for vec in T.vectorized(2):
+                            C[by * 128 + i // 32 * 64 + tx // 32 * 16 + i % 2 * 8 + tx % 32 // 4 - 64, bx * 128 + i % 32 // 2 * 8 + tx % 4 * 2 + vec] = C_local[i * 2 + vec]
+
+# Metadata omitted. Use show_meta=True in script() method to show it.

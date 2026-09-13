@@ -1,0 +1,39 @@
+{
+  "platform": "Linux-6.8.0-100-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3 (main, Jan 22 2026, 20:57:42) [GCC 13.3.0]",
+  "tilelang_version": "0.1.13",
+  "tilelang_path": "/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/__init__.py",
+  "shape_MNK": [
+    1024,
+    1024,
+    1024
+  ],
+  "tile_MNK": [
+    128,
+    128,
+    64
+  ],
+  "input_dtype": "bfloat16",
+  "accumulator_and_output_dtype": "float32",
+  "accumulator_scope": "local.fragment",
+  "threads": 128,
+  "num_stages": 3,
+  "source_only": false,
+  "kernel_launched": false,
+  "targets": {
+    "sm_90a": {
+      "target": "cuda -arch=sm_90a",
+      "lowering_ok": false,
+      "nvcc_ok": false,
+      "error": "Traceback (most recent call last):\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/backend/target.py\", line 103, in _validate_manual_target\n    Target(normalized_target)\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/3rdparty/tvm/python/tvm/target/target.py\", line 145, in __init__\n    self.__init_handle_by_constructor__(_ffi_api.Target, target)\n  File \"python/tvm_ffi/cython/object.pxi\", line 355, in tvm_ffi.core.Object.__init_handle_by_constructor__\n  File \"python/tvm_ffi/cython/object.pxi\", line 183, in tvm_ffi.core.CObject.__init_handle_by_constructor__\n  File \"python/tvm_ffi/cython/function.pxi\", line 126, in tvm_ffi.core.ConstructorCall\n  File \"python/tvm_ffi/cython/error.pxi\", line 193, in tvm_ffi.core.CHECK_CALL\n  File \"<unknown>\", line 0, in tvm::TargetInternal::ConstructorDispatcher(tvm::ffi::PackedArgs, tvm::ffi::Any*)\n  File \"<unknown>\", line 0, in tvm::Target::Target(tvm::ffi::String const&)\n  File \"/project/3rdparty/tvm/src/target/target.cc\", line 266, in static tvm::ffi::ObjectPtr<tvm::TargetNode> tvm::TargetInternal::FromString(const tvm::ffi::String&)\nValueError: Cannot parse target string \"cuda -arch=sm_90a\". CLI target string form (e.g. \"llvm -mcpu=xxx\") is no longer supported. Please use JSON dict form (e.g. {\"kind\": \"llvm\", \"mcpu\": \"xxx\"}) instead.. Target creation from string failed: cuda -arch=sm_90a\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/home/lcpu/27058528/wmhpc-training-camp-x-lcpu-ai-infra-seminars/assignment02/kernels/tilelang_6_1_export.py\", line 156, in main\n    artifact = lower(\n               ^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/engine/lower.py\", line 312, in lower\n    host_mod, device_mod, params, target, target_host = lower_to_host_device_ir(\n                                                        ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/engine/lower.py\", line 275, in lower_to_host_device_ir\n    target = determine_target(target)\n             ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/backend/target.py\", line 132, in determine_target\n    return_var = _validate_manual_target(target)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/backend/target.py\", line 105, in _validate_manual_target\n    raise AssertionError(\nAssertionError: Target cuda -arch=sm_90a is not supported. Pass target options as a dict when the target needs attributes.\n"
+    },
+    "sm_100a": {
+      "target": "cuda -arch=sm_100a",
+      "lowering_ok": false,
+      "nvcc_ok": false,
+      "error": "Traceback (most recent call last):\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/backend/target.py\", line 103, in _validate_manual_target\n    Target(normalized_target)\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/3rdparty/tvm/python/tvm/target/target.py\", line 145, in __init__\n    self.__init_handle_by_constructor__(_ffi_api.Target, target)\n  File \"python/tvm_ffi/cython/object.pxi\", line 355, in tvm_ffi.core.Object.__init_handle_by_constructor__\n  File \"python/tvm_ffi/cython/object.pxi\", line 183, in tvm_ffi.core.CObject.__init_handle_by_constructor__\n  File \"python/tvm_ffi/cython/function.pxi\", line 126, in tvm_ffi.core.ConstructorCall\n  File \"python/tvm_ffi/cython/error.pxi\", line 193, in tvm_ffi.core.CHECK_CALL\n  File \"<unknown>\", line 0, in tvm::TargetInternal::ConstructorDispatcher(tvm::ffi::PackedArgs, tvm::ffi::Any*)\n  File \"<unknown>\", line 0, in tvm::Target::Target(tvm::ffi::String const&)\n  File \"/project/3rdparty/tvm/src/target/target.cc\", line 266, in static tvm::ffi::ObjectPtr<tvm::TargetNode> tvm::TargetInternal::FromString(const tvm::ffi::String&)\nValueError: Cannot parse target string \"cuda -arch=sm_100a\". CLI target string form (e.g. \"llvm -mcpu=xxx\") is no longer supported. Please use JSON dict form (e.g. {\"kind\": \"llvm\", \"mcpu\": \"xxx\"}) instead.. Target creation from string failed: cuda -arch=sm_100a\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/home/lcpu/27058528/wmhpc-training-camp-x-lcpu-ai-infra-seminars/assignment02/kernels/tilelang_6_1_export.py\", line 156, in main\n    artifact = lower(\n               ^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/engine/lower.py\", line 312, in lower\n    host_mod, device_mod, params, target, target_host = lower_to_host_device_ir(\n                                                        ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/engine/lower.py\", line 275, in lower_to_host_device_ir\n    target = determine_target(target)\n             ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/backend/target.py\", line 132, in determine_target\n    return_var = _validate_manual_target(target)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/lcpu/.uv-cache/archive-v0/YuB3p-peqK2I-JUo/lib/python3.12/site-packages/tilelang/backend/target.py\", line 105, in _validate_manual_target\n    raise AssertionError(\nAssertionError: Target cuda -arch=sm_100a is not supported. Pass target options as a dict when the target needs attributes.\n"
+    }
+  },
+  "nvcc": "/usr/local/cuda/bin/nvcc",
+  "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Wed_Aug_20_01:58:59_PM_PDT_2025\nCuda compilation tools, release 13.0, V13.0.88\nBuild cuda_13.0.r13.0/compiler.36424714_0\n"
+}

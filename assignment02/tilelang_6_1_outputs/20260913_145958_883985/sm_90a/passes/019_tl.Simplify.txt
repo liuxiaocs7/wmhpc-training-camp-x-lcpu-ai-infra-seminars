@@ -1,0 +1,27 @@
+# from tvm.script import ir as I
+# from tvm.script import tirx as T
+
+@I.ir_module
+class Module:
+    @T.prim_func
+    def _gemm_ssr():
+        # with T.sblock("root"):
+        desc_a = T.sblock_alloc_buffer((1,), "uint64", scope="local.descriptor.wgmma")
+        desc_b = T.sblock_alloc_buffer((1,), "uint64", scope="local.descriptor.wgmma")
+        A_shared = T.handle("bfloat16", "shared.dyn")
+        T.initialize_wgmma_descriptor(desc_a[0], T.tvm_access_ptr(T.type_annotation("bfloat16"), A_shared, 0, 24576, 1), 1, 1, 64)
+        k = T.int32()
+        T.increase_descriptor_offset(desc_a[0], k % 3 * 16384)
+        B_shared = T.handle("bfloat16", "shared.dyn")
+        T.initialize_wgmma_descriptor(desc_b[0], T.tvm_access_ptr(T.type_annotation("bfloat16"), B_shared, 0, 24576, 1), 1, 512, 64)
+        T.increase_descriptor_offset(desc_b[0], k % 3 * 16384)
+        C_local = T.handle("float32", "local.fragment")
+        T.warpgroup_fence_operand("float32", C_local, 0, 128)
+        T.warpgroup_arrive()
+        for warp_j in T.unroll(1, annotations={"pragma_unroll_explicit": False}):
+            for i in T.unroll(2, annotations={"pragma_unroll_explicit": False}):
+                for ki in T.unroll(4, annotations={"pragma_unroll_explicit": False}):
+                    T.ptx_wgmma_ss("m64n128k16", T.bool(True), T.bool(False), "bf16", "bf16", "fp32", desc_a.data, T.shift_right(i * 8192 + ki * 32, 4), desc_b.data, T.shift_right(ki * 2048, 4), C_local, i * 64, 1, 1, 1)
+        T.warpgroup_commit_batch()
+        T.warpgroup_wait(0)
+        T.warpgroup_fence_operand("float32", C_local, 0, 128)

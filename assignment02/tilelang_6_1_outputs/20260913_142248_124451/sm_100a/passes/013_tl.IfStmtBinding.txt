@@ -1,0 +1,39 @@
+# from tvm.script import ir as I
+# from tvm.script import tirx as T
+
+@I.ir_module
+class Module:
+    @T.prim_func
+    def gemm(A_handle: T.handle, B_handle: T.handle, C_handle: T.handle):
+        T.func_attr({"target": T.target({"arch": "sm_100a", "host": {"keys": ["cpu"], "kind": "c", "tag": ""}, "keys": ["cuda", "gpu"], "kind": "cuda", "max_num_threads": 1024, "tag": "", "thread_warp_size": 32}), "tl_tiled_ws_applied": 1})
+        A = T.match_buffer(A_handle, (1024, 1024), "bfloat16", strides=(1024, 1))
+        B = T.match_buffer(B_handle, (1024, 1024), "bfloat16", strides=(1024, 1))
+        C = T.match_buffer(C_handle, (1024, 1024), strides=(1024, 1))
+        # with T.sblock("root"):
+        bx = T.launch_thread("blockIdx.x", 8)
+        by = T.launch_thread("blockIdx.y", 8)
+        tx = T.launch_thread("threadIdx.x", 256)
+        ty = T.launch_thread("threadIdx.y", 1)
+        tz = T.launch_thread("threadIdx.z", 1)
+        with T.sblock("tilelang_root"):
+            T.reads()
+            T.writes()
+            mbarrier = T.handle("uint64", "shared.barrier")
+            T.sblock_attr({"barrier_init": {mbarrier: [1, 1, 1, 128, 128, 128]}})
+            A_shared = T.sblock_alloc_buffer((3, 128, 64), "bfloat16", scope="shared.dyn")
+            B_shared = T.sblock_alloc_buffer((3, 64, 128), "bfloat16", scope="shared.dyn")
+            C_local = T.sblock_alloc_buffer((128, 128), scope="local.fragment")
+            mbarrier_1 = T.sblock_alloc_buffer((6,), "uint64", data=mbarrier, scope="shared.barrier")
+            T.attr([128, 128], "kWarpSpecializationScope", 0)
+            if tx < 128:
+                for k in range(16):
+                    T.mbarrier_wait_parity(mbarrier_1[3 + k % 3], T.bitwise_xor(k // 3 % 2, 1))
+                    T.tma_copy(T.region(A[by * 128, k * 64], 1, 128, 64), T.region(A_shared[k % 3, 0, 0], 2, 1, 128, 64), barrier=mbarrier_1[k % 3], is_tma_copy=1, tl.pipeline_mbar_phase_expr=k // 3 % 2)
+                    T.tma_copy(T.region(B[k * 64, bx * 128], 1, 64, 128), T.region(B_shared[k % 3, 0, 0], 2, 1, 64, 128), barrier=mbarrier_1[k % 3], is_tma_copy=1, emit_arrive=1, tl.pipeline_mbar_phase_expr=k // 3 % 2)
+            else:
+                T.fill(T.region(C_local[0, 0], 2, 128, 128), 0)
+                for k in range(16):
+                    T.mbarrier_wait_parity(mbarrier_1[k % 3], k // 3 % 2)
+                    T.gemm(T.region(A_shared[k % 3, 0, 0], 1, 1, 128, 64), T.region(B_shared[k % 3, 0, 0], 1, 1, 64, 128), T.region(C_local[0, 0], 3, 128, 128), T.bool(False), T.bool(False), 128, 128, 64, 0, T.bool(False), 64, 128, 0, 0, 1, 0, 0, 0, 0, tl.pipeline_mbar_phase_expr=k // 3 % 2)
+                    T.ptx_arrive_barrier(mbarrier_1[3 + k % 3])
+                T.copy(T.region(C_local[0, 0], 1, 128, 128), T.region(C[by * 128, bx * 128], 2, 128, 128))
